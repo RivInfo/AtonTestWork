@@ -16,7 +16,7 @@ public class UsersContext : DbContext
     {
         _connection = settings.Value.DatabaseConnection;
 
-        Database.EnsureDeleted();
+        //Database.EnsureDeleted();
         Database.EnsureCreated();
     }
     
@@ -28,13 +28,10 @@ public class UsersContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Property(x => x.Guid).HasDefaultValueSql("gen_random_uuid()");
-        //modelBuilder.Entity<User>().HasKey(x => x.Guid);
-        //modelBuilder.Entity<User>().Property(x => x.Guid).HasValueGenerator<GuidValueGenerator>();
-        
+
         modelBuilder.Entity<User>().HasData(
             new User
             {
-                //Guid = new Guid(),
                 Login = "Admin",
                 Password = "Admin",
                 Name = "Admin",

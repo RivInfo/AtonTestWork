@@ -40,11 +40,19 @@ public class UsersController : ControllerBase
             if (createData.IsAdmin != null)
                 if (!user.Admin)
                     return BadRequest();
+            
+            User dublicate = await _usersContext.Users.FirstOrDefaultAsync(x => x.Login == createData.Login);
+
+            if (dublicate != null)
+                return Conflict();
+        }
+        else
+        {
+            return BadRequest();
         }
 
-        _usersContext.Users.Add(new User()
+        User newUser = new User()
         {
-            //Guid = new Guid(),
             Login = createData.Login,
             Name = createData.Name,
             Password = createData.Password,
@@ -54,11 +62,16 @@ public class UsersController : ControllerBase
             CreatedOn = DateTime.Now.ToUniversalTime(),
             ModifiedOn = DateTime.Now.ToUniversalTime(),
             ModifiedBy = createData.AuthLogin
-        });
+        };
+
+        // if(!TryValidateModel(newUser)) //Validate variant 2
+        //     return BadRequest();
+
+        _usersContext.Users.Add(newUser);
 
         await _usersContext.SaveChangesAsync();
 
-        return Ok();
+        return Accepted();
     }
 
     [HttpGet]
