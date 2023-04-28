@@ -1,15 +1,18 @@
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace UsersWebAPI.DatabaseModels;
 
-[Index(nameof(Login), IsUnique = true)]
+//[Index(nameof(Login), IsUnique = true)]
+[Index(nameof(Guid), IsUnique = true)]
 public class User
 {
-    [Key] public Guid Guid { get; set; }
+    [Required]
+    public Guid Guid{ get; set; }
 
-    [Required, RegularExpression(@"^[a-zA-Z0-9]+$")]
+    [Key, Required, RegularExpression(@"^[a-zA-Z0-9]+$")]
     public string Login { get; set; }
 
     [Required, RegularExpression(@"^[a-zA-Z0-9]+$")]

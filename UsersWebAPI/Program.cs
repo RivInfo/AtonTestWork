@@ -1,3 +1,4 @@
+using UsersWebAPI.DB;
 using UsersWebAPI.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,8 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.Configure<DatabaseSettings>
     (builder.Configuration.GetSection(nameof(DatabaseSettings)));
+
+builder.Services.AddDbContext<UsersContext>();
 
 var app = builder.Build();
 
