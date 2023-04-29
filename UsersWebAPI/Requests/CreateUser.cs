@@ -16,5 +16,5 @@ public class CreateUser : IAuthData
     
     [Required, RegularExpression(@"[012]")] public int Gender { get; set; }
     
-    public bool? IsAdmin { get; set; }
+    [Required] public bool IsAdmin { get; set; }
 }

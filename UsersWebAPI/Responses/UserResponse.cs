@@ -15,6 +15,6 @@ public class UserResponse
         Name = user.Name;
         Gender = user.Gender;
         Birthday = user.Birthday;
-        IsActive = user.RevokedOn != null;
+        IsActive = user.RevokedOn == null;
     }
 }

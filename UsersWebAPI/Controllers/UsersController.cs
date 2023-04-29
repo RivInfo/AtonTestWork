@@ -31,12 +31,16 @@ public class UsersController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users.FirstOrDefaultAsync(x => x.Login == createData.AuthLogin);
-
-        if (!UserAuthentication(createData, userAuth))
+        (bool, User?) authentication = await UserAuthenticationAsync(createData);
+        
+        if (!authentication.Item1)
             return BadRequest();
-
-        User? dublicate = await _usersContext.Users.FirstOrDefaultAsync(x => x.Login == createData.Login);
+        
+        if(createData.IsAdmin != null)
+            if(createData.IsAdmin && !authentication.Item2.Admin)
+                return BadRequest();
+        
+        User? dublicate = await GetUserByLogin(createData.Login);
 
         if (dublicate != null)
             return Conflict();
@@ -51,7 +55,8 @@ public class UsersController : ControllerBase
             CreatedBy = createData.AuthLogin,
             CreatedOn = DateTime.UtcNow,
             ModifiedOn = DateTime.UtcNow,
-            ModifiedBy = createData.AuthLogin
+            ModifiedBy = createData.AuthLogin,
+            Admin = createData.IsAdmin
         };
 
         // if(!TryValidateModel(newUser)) //Validate variant 2
@@ -73,17 +78,17 @@ public class UsersController : ControllerBase
         if (reWriteUserData.Name == null && reWriteUserData.Gender == null && reWriteUserData.Birthday == null)
             return BadRequest();
             
-        User? userAuth = await _usersContext.Users.FirstOrDefaultAsync(x => x.Login == reWriteUserData.AuthLogin);
-
-        if (!UserAuthentication(reWriteUserData, userAuth))
+        var authentication = await UserAuthenticationAsync(reWriteUserData);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
-        User? reUser = await _usersContext.Users.FirstOrDefaultAsync(x => x.Login == reWriteUserData.ReLogin);
+        User? reUser = await GetUserByLogin(reWriteUserData.ReLogin);
 
         if (reUser == null)
             return BadRequest();
 
-        if (!userAuth.Admin && reUser.Login != reWriteUserData.ReLogin)
+        if (!authentication.Item2.Admin && reUser.Login != reWriteUserData.ReLogin)
             return BadRequest();
 
         if (reWriteUserData.Name != null)
@@ -95,7 +100,7 @@ public class UsersController : ControllerBase
         if (reWriteUserData.Birthday != null)
             reUser.Birthday = reWriteUserData.Birthday;
 
-        SetModified(reUser, userAuth);
+        SetModified(reUser, authentication.Item2);
 
         await _usersContext.SaveChangesAsync();
 
@@ -108,24 +113,22 @@ public class UsersController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == reWriteUserPassword.AuthLogin);
-
-        if (!UserAuthentication(reWriteUserPassword, userAuth))
+        var authentication = await UserAuthenticationAsync(reWriteUserPassword);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
-        User? reUser = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == reWriteUserPassword.ReLogin);
+        User? reUser = await GetUserByLogin(reWriteUserPassword.ReLogin);
 
         if (reUser == null)
             return BadRequest();
 
-        if (!userAuth.Admin && reUser.Login != reWriteUserPassword.ReLogin)
+        if (!authentication.Item2.Admin && reUser.Login != reWriteUserPassword.ReLogin)
             return BadRequest();
 
         reUser.Password = reWriteUserPassword.NewPassword;
         
-        SetModified(reUser, userAuth);
+        SetModified(reUser, authentication.Item2);
 
         await _usersContext.SaveChangesAsync();
 
@@ -139,23 +142,20 @@ public class UsersController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == reWriteUserLogin.AuthLogin);
-
-        if (!UserAuthentication(reWriteUserLogin, userAuth))
+        var authentication = await UserAuthenticationAsync(reWriteUserLogin);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
-        User? reUser = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == reWriteUserLogin.CurrentLogin);
+        User? reUser = await GetUserByLogin(reWriteUserLogin.CurrentLogin);
 
         if (reUser == null)
             return BadRequest();
 
-        if (!userAuth.Admin && reUser.Login != reWriteUserLogin.CurrentLogin)
+        if (!authentication.Item2.Admin && reUser.Login != reWriteUserLogin.CurrentLogin)
             return BadRequest();
 
-        User? dublicate = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == reWriteUserLogin.NewLogin);
+        User? dublicate = await GetUserByLogin(reWriteUserLogin.NewLogin);
 
         if (dublicate != null)
             return Conflict();
@@ -186,7 +186,7 @@ public class UsersController : ControllerBase
 
         newUser.Entity.Guid = saveGuid;
         
-        SetModified(newUser.Entity, userAuth);
+        SetModified(newUser.Entity, authentication.Item2);
 
         await _usersContext.SaveChangesAsync();
 
@@ -202,10 +202,9 @@ public class UsersController : ControllerBase
         if (!TryValidateModel(authData))
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == authData.AuthLogin);
-
-        if (!UserAuthenticationAdmin(authData, userAuth))
+        var authentication = await UserAuthenticationAdminAsync(authData);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
         List<User> users = await _usersContext.Users.Where(x => x.RevokedOn == null)
@@ -222,19 +221,18 @@ public class UsersController : ControllerBase
         if (!TryValidateModel(authData))
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == authData.AuthLogin);
-
-        if (!UserAuthenticationAdmin(authData, userAuth))
+        var authentication = await UserAuthenticationAdminAsync(authData);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
-        User? user = await _usersContext.Users.FirstOrDefaultAsync(x => x.Login == selectLogin);
+        User? user = await GetUserByLogin(selectLogin);
 
-        UserResponse? userResponse = null;
-
-        if (user != null)
-            userResponse = new UserResponse(user);
-
+        if (user == null)
+            return NotFound();
+            
+        UserResponse userResponse = new UserResponse(user);
+        
         return Ok(userResponse);
     }
 
@@ -246,13 +244,12 @@ public class UsersController : ControllerBase
         if (!TryValidateModel(authData))
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == authData.AuthLogin);
-
-        if (!UserAuthentication(authData, userAuth))
+        var authentication = await UserAuthenticationAsync(authData);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
-        return Ok(userAuth);
+        return Ok(authentication.Item2);
     }
 
     [HttpGet("getAllUserByBirthday")]
@@ -263,10 +260,9 @@ public class UsersController : ControllerBase
         if (!TryValidateModel(authData))
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == authData.AuthLogin);
-
-        if (!UserAuthenticationAdmin(authData, userAuth))
+        var authentication = await UserAuthenticationAdminAsync(authData);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
         List<User> users = await _usersContext.Users
@@ -286,14 +282,12 @@ public class UsersController : ControllerBase
         if (!TryValidateModel(authData))
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == authData.AuthLogin);
-
-        if (!UserAuthenticationAdmin(authData, userAuth))
+        var authentication = await UserAuthenticationAdminAsync(authData);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
-        User? targetUser = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == targetLogin);
+        User? targetUser = await GetUserByLogin(targetLogin);
 
         if (targetUser == null)
             return NotFound();
@@ -305,9 +299,9 @@ public class UsersController : ControllerBase
         else
         {
             targetUser.RevokedOn = DateTime.UtcNow;
-            targetUser.RevokedBy = userAuth.Login;
+            targetUser.RevokedBy = authentication.Item2.Login;
             
-            SetModified(targetUser, userAuth);
+            SetModified(targetUser, authentication.Item2);
         }
 
         await _usersContext.SaveChangesAsync();
@@ -321,14 +315,12 @@ public class UsersController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest();
 
-        User? userAuth = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == revokeDelete.AuthLogin);
-
-        if (!UserAuthenticationAdmin(revokeDelete, userAuth))
+        var authentication = await UserAuthenticationAdminAsync(revokeDelete);
+        
+        if (!authentication.Item1)
             return BadRequest();
 
-        User? targetUser = await _usersContext.Users
-            .FirstOrDefaultAsync(x => x.Login == revokeDelete.Login);
+        User? targetUser = await GetUserByLogin(revokeDelete.Login);
 
         if (targetUser == null)
             return NotFound();
@@ -336,13 +328,38 @@ public class UsersController : ControllerBase
         targetUser.RevokedBy = null;
         targetUser.RevokedOn = null;
         
-        SetModified(targetUser, userAuth);
+        SetModified(targetUser, authentication.Item2);
         
         await _usersContext.SaveChangesAsync();
 
         return Ok();
     }
+
+    private async Task<User?> GetUserByLogin(string login)
+    {
+        return await _usersContext.Users
+            .FirstOrDefaultAsync(x => x.Login == login);
+    }
     
+    private async Task<(bool, User?)> UserAuthenticationAdminAsync(IAuthData user)
+    {
+        User? userAuth = await GetUserByLogin(user.AuthLogin);
+
+        if (!UserAuthenticationAdmin(user, userAuth))
+            return (false, null);
+
+        return (true, userAuth);
+    }
+
+    private async Task<(bool, User?)> UserAuthenticationAsync(IAuthData user)
+    {
+        User? userAuth = await GetUserByLogin(user.AuthLogin);
+
+        if (!UserAuthentication(user, userAuth))
+            return (false, null);
+
+        return (true, userAuth);
+    }
 
     private static bool UserAuthentication(IAuthData user, User? authUser)
     {

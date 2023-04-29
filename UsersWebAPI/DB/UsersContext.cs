@@ -15,8 +15,7 @@ public class UsersContext : DbContext
     public UsersContext(IOptions<DatabaseSettings> settings)
     {
         _connection = settings.Value.DatabaseConnection;
-
-        //Database.EnsureDeleted();
+        
         Database.EnsureCreated();
     }
     
