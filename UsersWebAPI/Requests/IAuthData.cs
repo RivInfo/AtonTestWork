@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace UsersWebAPI.Requests;
 
 public interface IAuthData

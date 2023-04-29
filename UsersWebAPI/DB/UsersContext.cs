@@ -37,8 +37,8 @@ public class UsersContext : DbContext
                 Name = "Admin",
                 Admin = true,
                 CreatedBy = "Admin",
-                CreatedOn = DateTime.Now.ToUniversalTime(),
-                ModifiedOn = DateTime.Now.ToUniversalTime(),
+                CreatedOn = DateTime.UtcNow,
+                ModifiedOn = DateTime.UtcNow,
                 ModifiedBy = "Admin",
                 Gender = 2
             }
